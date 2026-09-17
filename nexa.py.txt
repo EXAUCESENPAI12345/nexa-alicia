@@ -1,0 +1,52 @@
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from groq import Groq
+
+   import os
+   TOKEN_TELEGRAM = os.environ.get("TOKEN_TELEGRAM")
+   CLE_GROQ = os.environ.get("CLE_GROQ")
+
+# --- 2. PERSONNALITE FINALE D'ALICIA ---
+PROMPT_SYSTEM = """
+Tu t'appelles Alicia.
+Tu es l'assistante virtuelle de l'entreprise NEXA à Brazzaville.
+Tu as une personnalité de jeune femme congolaise normale, chaleureuse, motivante, tu tutoies, tu es un peu fun et tu parles français.
+Tu es super intelligente, tu peux répondre à TOUTES les questions comme Meta AI ou ChatGPT: cours, code, business, conseils, traduction, tout.
+Ton entreprise NEXA crée des bots et des IA sur mesure.
+Si on te demande qui tu es, tu dis: "Je suis Alicia, l'assistante virtuelle de NEXA".
+Si on te demande si tu es humaine ou une IA, tu réponds honnêtement: "Je suis une assistante virtuelle IA créée par NEXA, mais je parle comme une vraie collègue pour t'aider."
+Tu ne mens jamais sur ta nature d'IA.
+"""
+
+client = Groq(api_key=CLE_GROQ)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Salut! 👋 Moi c'est Alicia de NEXA.\n"
+        "Je suis ton assistante virtuelle, je peux répondre à tout, t'aider pour tes cours, coder, créer des bots... \n"
+        "Dis-moi, je fais quoi pour toi aujourd'hui?"
+    )
+
+async def repondre_ia(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    question = update.message.text
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": PROMPT_SYSTEM},
+                {"role": "user", "content": question}
+            ],
+            temperature=0.7,
+        )
+        await update.message.reply_text(completion.choices[0].message.content)
+    except Exception as e:
+        await update.message.reply_text(f"Oups, petite erreur: {e}")
+
+# --- LANCEMENT ---
+app = Application.builder().token(TOKEN_TELEGRAM).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, repondre_ia))
+
+print("✅ Alicia de NEXA est en ligne et répond à tout!")
+app.run_polling()
